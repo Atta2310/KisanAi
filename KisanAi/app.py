@@ -7,11 +7,6 @@ from gtts import gTTS
 from deep_translator import GoogleTranslator
 import os
 
-
-
-st.write("Current working directory:", os.getcwd())
-st.write("Looking for model at:", os.path.abspath(MODEL_PATH))
-st.write("Does model exist?", os.path.exists(MODEL_PATH))
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
@@ -22,7 +17,14 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# Define MODEL_PATH first
 MODEL_PATH = "../models/phase2_model.h5"
+
+# Debugging info about model file presence
+st.write("Current working directory:", os.getcwd())
+st.write("Looking for model at:", os.path.abspath(MODEL_PATH))
+st.write("Does model exist?", os.path.exists(MODEL_PATH))
+
 IMAGE_SIZE = (224, 224)
 API_KEY = "cfb4cdf28f32906b67d0e60ca283e88e"
 
@@ -124,4 +126,3 @@ elif tab == "Crop Region Expert":
                 st.write(f"- {region}")
         else:
             st.error("Please enter a valid crop name!")
-            
