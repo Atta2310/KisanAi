@@ -1,4 +1,8 @@
 streamlit
 tensorflow
-numpy
 pillow
+numpy
+requests
+gtts
+deep-translator
+
