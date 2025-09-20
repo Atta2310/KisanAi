@@ -2,68 +2,121 @@ import streamlit as st
 import tensorflow as tf
 import numpy as np
 from PIL import Image
+import requests
+from gtts import gTTS
+from deep_translator import GoogleTranslator
+import os
 
-# Load the trained Phase 2 model
-MODEL_PATH = "models/phase2_model.h5"
+# -----------------------------
+# CONFIGURATION
+# -----------------------------
+st.set_page_config(
+    page_title="🌾 KisanAI",
+    page_icon="🌱",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
+MODEL_PATH = "model.h5"
+IMAGE_SIZE = (224, 224)
+API_KEY = "cfb4cdf28f32906b67d0e60ca283e88e"
+
+# -----------------------------
+# LOAD MODEL
+# -----------------------------
 @st.cache_resource
 def load_model():
+    if not os.path.exists(MODEL_PATH):
+        st.warning("❌ Model file not found. Upload `model.h5` to run predictions.")
+        return None
     model = tf.keras.models.load_model(MODEL_PATH)
     return model
 
 model = load_model()
 
-# Define class labels (example: update these to match your dataset)
-CLASS_NAMES = [
-    "Healthy", 
-    "Disease 1", 
-    "Disease 2", 
-    "Disease 3"
-]
+# -----------------------------
+# CLASS NAMES (update if needed)
+# -----------------------------
+CLASS_NAMES = {
+    0: "Rice - Bacterial leaf blight",
+    1: "Rice - Brown spot",
+    2: "Rice - Healthy",
+    3: "Wheat - Leaf rust",
+    4: "Wheat - Stem rust",
+    5: "Wheat - Healthy",
+    6: "Sugarcane - Red rot",
+    7: "Sugarcane - Top shoot borer",
+    8: "Sugarcane - Healthy"
+}
 
-st.set_page_config(page_title="🌾 KisanAI - Crop Disease Detector", layout="wide")
-
-# UI Header
-st.title("🌾 KisanAI - Smart Crop Disease Detection")
-st.markdown(
-    """
-    **Expert System trained with 30+ years of agricultural knowledge**  
-    Upload a leaf image and KisanAI will predict if it’s healthy or diseased.
-    """
-)
-
-# File uploader
-uploaded_file = st.file_uploader("📸 Upload a leaf image...", type=["jpg", "jpeg", "png"])
-
-if uploaded_file is not None:
-    image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption="Uploaded Image", use_column_width=True)
-
-    # Preprocess
-    img = image.resize((224, 224))  # adjust size to your training setup
-    img_array = np.array(img) / 255.0
+# -----------------------------
+# FUNCTIONS
+# -----------------------------
+def predict_disease(image):
+    img = image.resize(IMAGE_SIZE)
+    img_array = np.array(img)/255.0
     img_array = np.expand_dims(img_array, axis=0)
+    preds = model.predict(img_array)
+    class_idx = np.argmax(preds, axis=1)[0]
+    return CLASS_NAMES[class_idx]
 
-    # Prediction
-    prediction = model.predict(img_array)
-    score = np.max(prediction)
-    class_idx = np.argmax(prediction)
-    result = CLASS_NAMES[class_idx]
+def translate_text(text, language):
+    if language.lower() != "english":
+        try:
+            return GoogleTranslator(source="auto", target=language.lower()).translate(text)
+        except:
+            return text
+    return text
 
-    st.subheader("🔍 Prediction Result")
-    st.success(f"**{result}** with {score*100:.2f}% confidence")
+def crop_region(crop_name):
+    # Static mapping for Pakistan regions
+    regions = {
+        "Rice": ["Sindh: Hyderabad, Sukkur", "Punjab: Lahore, Faisalabad"],
+        "Wheat": ["Punjab: Multan, Sahiwal", "KPK: Peshawar"],
+        "Sugarcane": ["Sindh: Nawabshah", "Punjab: Bahawalpur"]
+    }
+    return regions.get(crop_name.title(), ["No suitable region found."])
 
-    # Expert advice section
-    st.subheader("👨‍🌾 Expert Advice (Based on 30 years of agricultural knowledge)")
-    if result == "Healthy":
-        st.info("✅ Your crop looks healthy! Keep monitoring regularly and ensure proper watering and fertilization.")
-    else:
-        st.warning(f"⚠️ Detected {result}.")
-        st.write("👉 Recommended steps:")
-        st.write("- Remove affected leaves to prevent spread")
-        st.write("- Use recommended fungicides/pesticides")
-        st.write("- Rotate crops to reduce soil-borne pathogens")
-        st.write("- Consult a local agricultural extension expert for precise treatment")
+# -----------------------------
+# SIDEBAR
+# -----------------------------
+st.sidebar.title("KisanAI 🌾")
+st.sidebar.markdown("AI-powered crop disease detector & region advisor.")
 
-st.markdown("---")
-st.markdown("🚀 Developed with ❤️ for farmers in Pakistan by **KisanAI**")
+tab = st.sidebar.radio("Select Feature", ["Disease Detector", "Crop Region Expert"])
+language = st.sidebar.selectbox("Select Language", ["English", "Urdu", "Sindhi", "Punjabi"])
+
+# -----------------------------
+# MAIN APP
+# -----------------------------
+st.title("🌱 KisanAI - Crop Advisor")
+
+if tab == "Disease Detector":
+    st.header("📸 Upload Crop Image for Disease Detection")
+    uploaded_file = st.file_uploader("Choose an image...", type=["jpg","png","jpeg"])
+    
+    if uploaded_file:
+        image = Image.open(uploaded_file)
+        st.image(image, caption="Uploaded Image", use_container_width=True)
+        
+        if model:
+            with st.spinner("Analyzing..."):
+                disease = predict_disease(image)
+                disease_translated = translate_text(disease, language)
+                st.success(f"Prediction: {disease_translated}")
+        else:
+            st.error("Model not loaded!")
+
+elif tab == "Crop Region Expert":
+    st.header("🌾 Crop Region Advisor")
+    crop_name = st.text_input("Enter Crop Name (Rice/Wheat/Sugarcane):")
+    
+    if st.button("Find Suitable Regions"):
+        if crop_name.strip() != "":
+            regions = crop_region(crop_name)
+            st.info(f"Suitable regions for {crop_name.title()}:")
+            for region in regions:
+                st.write(f"- {region}")
+        else:
+            st.error("Please enter a valid crop name!")
+            
