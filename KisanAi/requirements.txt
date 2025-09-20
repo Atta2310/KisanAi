@@ -1,8 +1,0 @@
-streamlit
-tensorflow
-pillow
-numpy
-requests
-gtts
-deep-translator
-
