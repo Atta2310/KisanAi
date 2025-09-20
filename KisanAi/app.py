@@ -18,7 +18,8 @@ st.set_page_config(
 )
 
 # Define MODEL_PATH first
-MODEL_PATH = "../models/phase2_model.h5"
+MODEL_PATH = "models/phase2_model.h5"
+
 
 # Debugging info about model file presence
 st.write("Current working directory:", os.getcwd())
