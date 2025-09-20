@@ -1,8 +1,37 @@
+# requirements.txt for KisanAI
 
+# Gradio for UI
 gradio==3.42.0
+
+# TensorFlow CPU version
 tensorflow-cpu==2.18.0
-numpy==1.25.0
-Pillow==10.0.0
-gTTS==2.3.2
+
+# Pillow for image handling
+Pillow>=10.0.0
+
+# NumPy for numerical computations
+numpy>=1.26.0,<2.1.0
+
+# gTTS for text-to-speech
+gTTS>=2.5.4
+
+# Google Translator
 googletrans==4.0.0-rc1
-requests==2.31.0
+
+# Requests for API calls
+requests>=2.32.0
+
+# Utilities
+aiofiles>=23.2.1
+fastapi>=0.116.1
+httpx>=0.13.3
+huggingface-hub>=0.14.0
+pydub>=0.25.1
+python-multipart>=0.0.20
+
+# Optional: For plotting and data handling
+matplotlib>=3.10.0
+pandas>=2.2.0
+
+# Ensure compatibility
+typing-extensions>=4.15.0
