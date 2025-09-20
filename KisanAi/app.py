@@ -1,80 +1,110 @@
+# app.py
 import streamlit as st
-from PIL import Image
-import numpy as np
 import tensorflow as tf
-from deep_translator import GoogleTranslator
-from gtts import gTTS
-import os
-import tempfile
+from tensorflow.keras.preprocessing import image
+import numpy as np
+from PIL import Image
+import requests
 
-# Assume model loading code here (fix your model inputs issue first)
-MODEL_PATH = "models/phase2_model.h5"
-model = tf.keras.models.load_model(MODEL_PATH)
+# -------------------------
+# Constants
+# -------------------------
+MODEL_PATH = "phase2_model.h5"  # Make sure this is in the same folder
+IMAGE_SIZE = (224, 224)         # Adjust according to your model
+API_KEY = "YOUR_OPENWEATHER_API_KEY"
 
-CLASS_NAMES = {
-    0: "Rice - Bacterial leaf blight",
-    1: "Rice - Brown spot",
-    2: "Rice - Healthy",
-    # etc...
-}
+# -------------------------
+# Load Model
+# -------------------------
+@st.cache_resource
+def load_model():
+    model = tf.keras.models.load_model(MODEL_PATH, compile=False)
+    return model
 
-DISEASE_SOLUTIONS = {
-    "Rice - Bacterial leaf blight": "Use resistant varieties, apply recommended bactericides.",
-    "Rice - Brown spot": "Improve soil health and apply fungicides.",
-    # Add solution text for each disease
-}
+model = load_model()
 
-LANG_CODE_MAP = {
-    "English": "en",
-    "Urdu": "ur",
-    "Punjabi": "pa",
-    "Sindhi": "sd",
-    "Pashto": "ps"
-}
+st.set_page_config(
+    page_title="KisanAI",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-def translate_text(text, target_lang):
-    if target_lang != "English":
-        try:
-            return GoogleTranslator(source='auto', target=target_lang.lower()).translate(text)
-        except Exception:
-            return text
-    return text
+# -------------------------
+# Sidebar
+# -------------------------
+st.sidebar.title("KisanAI 🌱")
+page = st.sidebar.radio("Navigation", ["Home", "Predict Crop", "Best Region API"])
 
-def text_to_speech(text, lang_code):
-    tts = gTTS(text=text, lang=lang_code)
-    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-    tts.save(tmp_file.name)
-    return tmp_file.name
+# -------------------------
+# Home Page
+# -------------------------
+if page == "Home":
+    st.markdown("<h1 style='text-align: center; color: green;'>🌾 KisanAI</h1>", unsafe_allow_html=True)
+    st.markdown("""
+        <p style='text-align: center;'>
+        AI-powered crop prediction & best region recommendation in Pakistan.
+        </p>
+    """, unsafe_allow_html=True)
 
-st.title("🌱 KisanAI Crop Disease Detector")
+    st.image("assets/logo.png", use_column_width=True)
 
-language = st.selectbox("Select Language", list(LANG_CODE_MAP.keys()))
-uploaded_file = st.file_uploader("Upload crop image...", type=["jpg", "png", "jpeg"])
+# -------------------------
+# Crop Prediction Page
+# -------------------------
+elif page == "Predict Crop":
+    st.header("Predict Crop Disease/Type")
+    
+    uploaded_file = st.file_uploader("Upload Crop Image", type=["jpg", "jpeg", "png"])
+    
+    if uploaded_file:
+        img = Image.open(uploaded_file).convert("RGB")
+        st.image(img, caption="Uploaded Image", use_column_width=True)
+        
+        # Process image
+        img_resized = img.resize(IMAGE_SIZE)
+        img_array = np.array(img_resized) / 255.0
+        img_array = np.expand_dims(img_array, axis=0)
+        
+        # -------------------------
+        # Prepare dummy second input if model expects 2 inputs
+        # -------------------------
+        if len(model.inputs) == 2:
+            input2_shape = model.inputs[1].shape  # e.g., (None, 7,7,1280)
+            dummy_input2 = np.zeros(shape=(1,) + tuple(input2_shape[1:]), dtype=np.float32)
+            preds = model.predict([img_array, dummy_input2])
+        else:
+            preds = model.predict(img_array)
+        
+        # Display prediction
+        pred_class = np.argmax(preds, axis=1)
+        st.success(f"Predicted Class ID: {pred_class[0]}")
 
-if uploaded_file and st.button("Predict"):
-    image = Image.open(uploaded_file).resize((224, 224))
-    img_array = np.array(image)/255.0
-    img_array = np.expand_dims(img_array, axis=0)
+# -------------------------
+# Best Region API Page
+# -------------------------
+elif page == "Best Region API":
+    st.header("Find Best Region for Crop 🌾")
+    crop_name = st.text_input("Enter Crop Name (e.g., Wheat, Rice):")
+    
+    if st.button("Check Best Regions"):
+        if crop_name:
+            url = f"http://api.openweathermap.org/data/2.5/weather?q={crop_name}&appid={API_KEY}"
+            try:
+                response = requests.get(url)
+                data = response.json()
+                
+                if data.get("cod") == 200:
+                    st.success(f"Weather data received for {crop_name} region!")
+                    st.json(data)
+                else:
+                    st.error(f"Error fetching data: {data.get('message')}")
+            except Exception as e:
+                st.error(f"API Error: {e}")
+        else:
+            st.warning("Please enter a crop name.")
 
-    # For multi-input model, add dummy second input (adjust as needed)
-    # dummy_input = np.zeros((1, 7, 7, 1280), dtype=np.float32)
-    # preds = model.predict([img_array, dummy_input])
-
-    preds = model.predict(img_array)
-    pred_class_idx = np.argmax(preds)
-    disease_name = CLASS_NAMES[pred_class_idx]
-    solution = DISEASE_SOLUTIONS.get(disease_name, "No solution available.")
-
-    disease_translated = translate_text(disease_name, language)
-    solution_translated = translate_text(solution, language)
-    st.success(f"Disease: {disease_translated}")
-    st.info(f"Solution: {solution_translated}")
-
-    # Text to speech in selected language
-    lang_code = LANG_CODE_MAP[language]
-    combined_text = f"{disease_translated}. {solution_translated}"
-    audio_file = text_to_speech(combined_text, lang_code)
-    st.audio(audio_file)
-
-    # Clean up temp audio file after use
-    os.remove(audio_file)
+# -------------------------
+# Footer
+# -------------------------
+st.markdown("---")
+st.markdown("<p style='text-align: center;'>Made with ❤️ by KisanAI</p>", unsafe_allow_html=True)
