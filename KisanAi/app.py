@@ -17,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-MODEL_PATH = "/content/KisanAi/KisanAi/model.h5"
+MODEL_PATH = "models/phase2_model.h5"
 IMAGE_SIZE = (224, 224)
 API_KEY = "cfb4cdf28f32906b67d0e60ca283e88e"
 
