@@ -2,35 +2,95 @@ import streamlit as st
 import tensorflow as tf
 import numpy as np
 from PIL import Image
-import os
-from gtts import gTTS
 from deep_translator import GoogleTranslator
+import os
 
 # -----------------------------
-# CONFIGURATION
+# CONFIGURATION & STYLING
 # -----------------------------
+
 st.set_page_config(
-    page_title="🌾 KisanAI",
+    page_title="🌾 KisanAI - Crop Advisor",
     page_icon="🌱",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-MODEL_PATH = "models/phase2_model.h5"  # Adjust if your model is in a different folder
+# Custom CSS for modern UI
+st.markdown(
+    """
+    <style>
+    /* General font & background */
+    body, .css-18e3th9 {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: #f0f7f4;
+    }
+    /* Title style */
+    .main > div > div > div > h1 {
+        color: #2c6e49;
+        font-weight: 700;
+        font-size: 3rem;
+        margin-bottom: 0.25rem;
+    }
+    /* Sidebar */
+    .css-1d391kg, .css-1v3fvcr {
+        background-color: #2c6e49;
+        color: white;
+        padding: 1rem 1.5rem;
+    }
+    /* Sidebar widgets */
+    .css-14xtw13, .css-1avcm0n, .css-1v0mbdj {
+        color: #e6f0ea;
+    }
+    /* Buttons */
+    div.stButton > button {
+        background-color: #3a8d56;
+        color: white;
+        border-radius: 10px;
+        height: 3rem;
+        width: 100%;
+        font-weight: 600;
+        transition: background-color 0.3s ease;
+    }
+    div.stButton > button:hover {
+        background-color: #276637;
+        cursor: pointer;
+    }
+    /* File uploader */
+    .css-1pahdxg-control {
+        border-radius: 10px;
+        border: 1.5px solid #3a8d56;
+    }
+    /* Prediction text */
+    .stSuccess {
+        font-size: 1.5rem;
+        color: #276637;
+        font-weight: 700;
+    }
+    .stWarning {
+        color: #cc3d3d;
+        font-weight: 700;
+    }
+    </style>
+    """, unsafe_allow_html=True
+)
+
+MODEL_PATH = "models/phase2_model.h5"
 IMAGE_SIZE = (224, 224)
-API_KEY = "cfb4cdf28f32906b67d0e60ca283e88e"
 
 # -----------------------------
 # LOAD MODEL
 # -----------------------------
+
+@st.cache_resource(show_spinner=False)
 def load_model():
-    st.write(f"Loading model from: {MODEL_PATH}")
+    st.info(f"Loading model from: `{MODEL_PATH}`")
     if not os.path.exists(MODEL_PATH):
-        st.warning("❌ Model file not found. Upload `model.h5` to run predictions.")
+        st.warning("❌ Model file not found. Upload `phase2_model.h5` to `models` folder.")
         return None
     try:
         model = tf.keras.models.load_model(MODEL_PATH)
-        st.write("✅ Model loaded successfully!")
+        st.success("✅ Model loaded successfully!")
         return model
     except Exception as e:
         st.error(f"❌ Error loading model: {e}")
@@ -59,10 +119,21 @@ CLASS_NAMES = {
 def predict_disease(image):
     img = image.resize(IMAGE_SIZE)
     img_array = np.array(img) / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
-    preds = model.predict(img_array)
+    img_array = np.expand_dims(img_array, axis=0).astype(np.float32)
+
+    # Check model inputs
+    if not model:
+        return None
+
+    if len(model.inputs) == 1:
+        preds = model.predict(img_array)
+    else:
+        # Prepare dummy second input as zeros with correct shape
+        second_input_shape = model.inputs[1].shape  # (None, ...)
+        dummy_input = np.zeros((1,) + tuple(second_input_shape[1:]), dtype=np.float32)
+        preds = model.predict([img_array, dummy_input])
     class_idx = np.argmax(preds, axis=1)[0]
-    return CLASS_NAMES[class_idx]
+    return CLASS_NAMES.get(class_idx, "Unknown")
 
 def translate_text(text, language):
     if language.lower() != "english":
@@ -83,11 +154,11 @@ def crop_region(crop_name):
 # -----------------------------
 # SIDEBAR
 # -----------------------------
-st.sidebar.title("KisanAI 🌾")
-st.sidebar.markdown("AI-powered crop disease detector & region advisor.")
-
-tab = st.sidebar.radio("Select Feature", ["Disease Detector", "Crop Region Expert"])
-language = st.sidebar.selectbox("Select Language", ["English", "Urdu", "Sindhi", "Punjabi"])
+with st.sidebar:
+    st.title("🌾 KisanAI")
+    st.markdown("AI-powered crop disease detector & region advisor.")
+    tab = st.radio("Select Feature", ["Disease Detector", "Crop Region Expert"])
+    language = st.selectbox("Select Language", ["English", "Urdu", "Sindhi", "Punjabi"])
 
 # -----------------------------
 # MAIN APP
@@ -96,7 +167,7 @@ st.title("🌱 KisanAI - Crop Advisor")
 
 if tab == "Disease Detector":
     st.header("📸 Upload Crop Image for Disease Detection")
-    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
+    uploaded_file = st.file_uploader("Choose an image...", type=["jpg","png","jpeg"])
 
     if uploaded_file:
         image = Image.open(uploaded_file)
@@ -106,19 +177,31 @@ if tab == "Disease Detector":
             with st.spinner("Analyzing..."):
                 disease = predict_disease(image)
                 disease_translated = translate_text(disease, language)
-                st.success(f"Prediction: {disease_translated}")
+                if disease:
+                    st.success(f"Prediction: {disease_translated}")
+                else:
+                    st.error("Prediction failed.")
         else:
             st.error("Model not loaded!")
+
+    # Show model input details
+    if model:
+        st.markdown("---")
+        st.subheader("Model Info")
+        st.write(f"Model expects {len(model.inputs)} input(s):")
+        for i, inp in enumerate(model.inputs):
+            st.write(f"- Input {i+1} shape: {inp.shape}")
 
 elif tab == "Crop Region Expert":
     st.header("🌾 Crop Region Advisor")
     crop_name = st.text_input("Enter Crop Name (Rice/Wheat/Sugarcane):")
 
     if st.button("Find Suitable Regions"):
-        if crop_name.strip() != "":
+        if crop_name.strip():
             regions = crop_region(crop_name)
             st.info(f"Suitable regions for {crop_name.title()}:")
             for region in regions:
-                st.write(f"- {region}")
+                st.write(f"• {region}")
         else:
             st.error("Please enter a valid crop name!")
+
