@@ -7,6 +7,11 @@ from gtts import gTTS
 from deep_translator import GoogleTranslator
 import os
 
+
+
+st.write("Current working directory:", os.getcwd())
+st.write("Looking for model at:", os.path.abspath(MODEL_PATH))
+st.write("Does model exist?", os.path.exists(MODEL_PATH))
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
