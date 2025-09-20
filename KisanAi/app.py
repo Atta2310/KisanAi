@@ -9,7 +9,8 @@ import requests
 # -------------------------
 # Constants
 # -------------------------
-MODEL_PATH = "models/phase2_model.h5"  # Make sure this is in the same folder
+MODEL_PATH = "models/phase2_model.h5"
+  # Make sure this is in the same folder
 IMAGE_SIZE = (224, 224)         # Adjust according to your model
 API_KEY = "YOUR_OPENWEATHER_API_KEY"
 
