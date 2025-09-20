@@ -3,5 +3,4 @@ tensorflow
 numpy
 pillow
 requests
-deep-translator
-gtts
+pandas
